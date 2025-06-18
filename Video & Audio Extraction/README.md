@@ -1,4 +1,10 @@
 Video & Audio Extraction
 
 VideoExtract.py
-This file contains functions for video and audio extracting into .jpg and .wav
+This script performs initial preprocessing on raw video files by extracting:
+
+One frame per second as .jpg images
+
+The full audio track in high-quality .wav format
+
+This provides essential input data for downstream multimodal analysis such as visual scoring, ASR transcription, and scene segmentation.
