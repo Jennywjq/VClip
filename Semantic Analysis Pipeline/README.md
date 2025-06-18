@@ -43,7 +43,7 @@ python transcription.py
 ---
 
 
-### ✂️ Stage 2: Initial Segmentation 
+### 🧠 Stage 2: Initial Segmentation 
 
 This stage is executed by the segment_text.py script.
 
