@@ -6,7 +6,6 @@ import sys
 def semantic_segment_final(transcript_path: str, output_path: str, api_key: str) -> bool:
     """使用 OpenAI 库调用 DeepSeek API 进行语义分段。"""
 
-    # 读取transcription.py的结果json文件
     try:
         with open(transcript_path, 'r', encoding='utf-8') as f:
             transcript_data = json.load(f)
@@ -33,7 +32,7 @@ def semantic_segment_final(transcript_path: str, output_path: str, api_key: str)
 ]
 """
      
-    print("正在初始化客户端并连接 DeepSeek API...")
+    print("正在连接 DeepSeek API...")
     try:
         client = OpenAI(
             api_key=api_key,
@@ -84,7 +83,10 @@ def semantic_segment_final(transcript_path: str, output_path: str, api_key: str)
                 "paragraph_text": paragraph_text
             })
 
-        # 保存分段后的文稿
+        output_dir = os.path.dirname(output_path)
+        if not os.path.exists(output_dir) and output_dir != '': 
+            os.makedirs(output_dir, exist_ok=True)
+
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(final_paragraphs, f, ensure_ascii=False, indent=4)
          
@@ -100,9 +102,13 @@ def semantic_segment_final(transcript_path: str, output_path: str, api_key: str)
 if __name__ == "__main__":
     my_api_key = "sk-984f91a660ca40ab9427e513a97f67ca"   # <--- 可以改 API 密钥 
 
-    # 文件路径 可改
-    input_transcript = "transcript.json"
-    output_segmented = "segmented_transcript.json"
+    google_drive_base_path = "/content/drive/My Drive/"    # <--- 改路径
+    colab_output_folder = os.path.join(google_drive_base_path, "Colab_Output") 
+
+    os.makedirs(colab_output_folder, exist_ok=True)
+
+    input_transcript = os.path.join(colab_output_folder, "transcript.json") 
+    output_segmented = os.path.join(colab_output_folder, "segmented_transcript.json")
 
     if os.path.exists(input_transcript):
         semantic_segment_final(
@@ -111,4 +117,4 @@ if __name__ == "__main__":
             api_key=my_api_key
         )
     else:
-        print(f"错误: 找不到输入文件 '{input_transcript}'。请确保阶段一的脚本已成功运行。")
+        print(f"错误: 找不到输入文件 '{input_transcript}'。请确保阶段一的脚本已成功运行，并且 'transcript.json' 文件存在于 Google Drive 的 '{colab_output_folder}' 路径下。")
