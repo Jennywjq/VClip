@@ -62,6 +62,7 @@ This stage is executed by the segment_text.py script.
 python segment_text.py
 ```
 
+---
 
 ### 🧠 Stage 3: Highlight Scoring
 
