@@ -10,6 +10,7 @@ Install all necessary Python packages using the `requirements.txt` file by runni
 
 ```bash
 pip install -r requirements.txt
+```
 
 ## 🚀 How to Run
 
@@ -33,6 +34,7 @@ Generates a timestamped transcript stored in the output/ folder
 
 ```bash
 python transcription.py
+```
 
 
 ### ✂️ Stage 2: Initial Segmentation (初步分段)
@@ -53,3 +55,4 @@ Start and end timestamps for each paragraph
 
 ```bash
 python segment_text.py
+```
