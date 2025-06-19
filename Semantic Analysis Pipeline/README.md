@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 ---
 
-## 🚀 How to Run
+## 🚀 Pipeline
 
 ### 🧠 Stage 1: Audio Transcription (transcription.py)
 
@@ -66,7 +66,7 @@ Logic: Load the model → Input the text → Output the emotion (e.g., positive/
 
 #### 🪄 2. Keyword Density Analysis (analyze_keywords.py)
 
-Two-Stage Refinement (TF-IDF + DeepSeek)
+Two-Stage Refinement (TF-IDF + DeepSeek):
 
 Initial Screening (by TF-IDF):
 We use the TF-IDF algorithm as an efficient “pre-selection” tool to quickly generate a shortlist of 5–10 candidate keywords from the paragraph.
