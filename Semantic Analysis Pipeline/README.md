@@ -78,11 +78,16 @@ Compared to the standard BERT model, it has been trained on a more diverse range
 Logic: Load the model → Input the text → Output the emotion (e.g., positive/negative) and confidence score → Convert the result into a numerical score (e.g., +1 for positive, -1 for negative).
 
 
-#### 🪄 2. Keyword Density Analysis (analyze_keywords)
+#### 🪄 2. Keyword Density Analysis (analyze_keywords.py)
 
-Applies traditional NLP techniques to assess how relevant a paragraph is to the video’s core topic.
+Two-Stage Refinement (TF-IDF + DeepSeek)
 
-Logic: Input the keyword list → Count how many core keywords appear in the current paragraph → Assign a score based on the number and density of matched keywords.
+Initial Screening (by TF-IDF):
+We use the TF-IDF algorithm as an efficient “pre-selection” tool to quickly generate a shortlist of 5–10 candidate keywords from the paragraph.
+
+Final Review (by DeepSeek):
+Then, we feed the original paragraph along with the candidate list to DeepSeek, which acts as a final judge.
+Leveraging its deep language understanding, it selects the most essential and irreplaceable keywords from the shortlist.
 
 #### 🪄 3. Golden Quote Detection (analyze_golden_quote)
 
