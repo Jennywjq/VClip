@@ -68,12 +68,14 @@ python segment_text.py
 
 ‼️ Core Task ：This stage analyzes each semantic paragraph generated in Stage 2 and scores it across three dimensions: Emotion, Keyword Density and Golden Quote Detection.
 
-#### 🪄 1. Emotion Analysis (analyze_emotion)
+#### 🪄 1. Emotion Analysis (analyze_emotion.py)
 
-Uses a BERT-based model to analyze the emotional tone of each paragraph.
+The model used is the Erlangshen series RoBERTa model: IDEA-CCNL/Erlangshen-Roberta-110M-Sentiment.
+Compared to the standard BERT model, it has been trained on a more diverse range of data types, including a large volume of social media-style text. This makes it more capable of handling internet slang and flexible sentence structures commonly found in TV show or variety show reviews.
+(However, it may still misinterpret certain sarcastic or passive-aggressive expressions.)
 
 
-Logic: Load the model → Input the text → Output the emotion (e.g., positive/negative) and confidence score → Convert the result into a numerical score (e.g., +1 for positive, -1 for negative, and 0 for neutral).
+Logic: Load the model → Input the text → Output the emotion (e.g., positive/negative) and confidence score → Convert the result into a numerical score (e.g., +1 for positive, -1 for negative).
 
 
 #### 🪄 2. Keyword Density Analysis (analyze_keywords)
