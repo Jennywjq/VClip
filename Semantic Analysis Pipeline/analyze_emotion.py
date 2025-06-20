@@ -42,20 +42,21 @@ def analyze_emotion(text: str) -> float:
         return 0.0
 
 
-initialize_emotion_model()
+if __name__ == "__main__":
+    initialize_emotion_model()
 
-if emotion_analyzer_pipeline:
-    text1 = "这部剧的男主角演技太神了，剧情也很紧凑，yyds！"
-    #text2 = "等了一星期更新，结果剧情超拖戏，看到快睡着，好失望。"
-    text2 = "嗯，只能说我这种普通观众的审美水平还是有限，暂时还欣赏不来这么先锋的艺术"
-    text3 = "就这？就这？我还以为是什么惊天动地的神作呢，看来是我期待太高了。"
+    if emotion_analyzer_pipeline:
+        text1 = "这部剧的男主角演技太神了，剧情也很紧凑，yyds！"
+        # text2 = "等了一星期更新，结果剧情超拖戏，看到快睡着，好失望。"
+        text2 = "嗯，只能说我这种普通观众的审美水平还是有限，暂时还欣赏不来这么先锋的艺术"
+        text3 = "就这？就这？我还以为是什么惊天动地的神作呢，看来是我期待太高了。"
 
-    emotion_score1 = analyze_emotion(text1)
-    emotion_score2 = analyze_emotion(text2)
-    emotion_score3 = analyze_emotion(text3)
+        emotion_score1 = analyze_emotion(text1)
+        emotion_score2 = analyze_emotion(text2)
+        emotion_score3 = analyze_emotion(text3)
 
-    print(f"文本: '{text1}'\n情感分数: {emotion_score1:.4f}")
-    print("-" * 20)
-    print(f"文本: '{text2}'\n情感分数: {emotion_score2:.4f}")
-    print("-" * 20)
-    print(f"文本: '{text3}'\n情感分数: {emotion_score3:.4f}")
+        print(f"文本: '{text1}'\n情感分数: {emotion_score1:.4f}")
+        print("-" * 20)
+        print(f"文本: '{text2}'\n情感分数: {emotion_score2:.4f}")
+        print("-" * 20)
+        print(f"文本: '{text3}'\n情感分数: {emotion_score3:.4f}")
