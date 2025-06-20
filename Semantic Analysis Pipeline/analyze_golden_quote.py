@@ -1,5 +1,6 @@
 from openai import OpenAI
 import json
+import os
 
 api_client = None
 
@@ -57,23 +58,22 @@ def analyze_golden_quote_with_explanation(text: str) -> dict:
         print(f" 金句检测 API 调用失败: {e}")
         return {"score": 0, "quote": "", "explanation": f"API Error: {e}"}
 
-
-
-
-my_api_key = "sk-984f91a660ca40ab9427e513a97f67ca"
-
-paragraph_with_quote = "我们常说，技术的发展是一把双刃剑。但真正重要的，不是剑本身，而是握剑的人。这决定了我们走向哪个未来。"
-paragraph_without_quote = "回顾我们这个季度的表现，财报数据显示用户增长了15%，这个数据符合团队的预期，基本上是按照项目计划书稳步推进的，但真正让我感触最深的，其实并不是这些冰冷的数字，而是我发现，一个团队真正的力量，并非来自完美的KPI指标，而是源于每个人心中那份不可替代的归属感与凝聚力，这才是我们能克服所有困难的基石。因此，在下个阶段的工作安排中，除了要继续优化A/B测试的流程，我们还需要安排一次团队建设活动。"
-
-if api_client:
-    result_with = analyze_golden_quote_with_explanation(paragraph_with_quote)
-    result_without = analyze_golden_quote_with_explanation(paragraph_without_quote)
-
-    print(f"输入 (含金句): '{paragraph_with_quote}'")
-    print(f"得分: {result_with['score']}, 金句内容: '{result_with['quote']}'")
-    print(f"【推荐理由】: {result_with['explanation']}")
-    print("-" * 20)
+if __name__ == "__main__":
+    my_api_key = "sk-984f91a660ca40ab9427e513a97f67ca" 
     
-    print(f"输入 (不含金句): '{paragraph_without_quote}'")
-    print(f"得分: {result_without['score']}, 金句内容: '{result_without['quote']}'")
-    print(f"【推荐理由】: {result_without['explanation']}")
+    initialize_api_client(my_api_key)
+
+    paragraph_with_quote = "我们常说，技术的发展是一把双刃剑。但真正重要的，不是剑本身，而是握剑的人。这决定了我们走向哪个未来。"
+    paragraph_long_and_mixed = "回顾我们这个季度的表现，财报数据显示用户增长了15%，这个数据符合团队的预期，基本上是按照项目计划书稳步推进的，但真正让我感触最深的，其实并不是这些冰冷的数字，而是我发现，一个团队真正的力量，并非来自完美的KPI指标，而是源于每个人心中那份不可替代的归属感与凝聚力，这才是我们能克服所有困难的基石。因此，在下个阶段的工作安排中，除了要继续优化A/B测试的流程，我们还需要安排一次团队建设活动。"
+
+    if api_client:
+        result_with = analyze_golden_quote_with_explanation(paragraph_with_quote)
+        print(f"\n输入 (含金句): '{paragraph_with_quote}'")
+        print(f"得分: {result_with['score']}, 金句内容: '{result_with['quote']}'")
+        print(f"【推荐理由】: {result_with['explanation']}")
+        print("-" * 20)
+        
+        result_long = analyze_golden_quote_with_explanation(paragraph_long_and_mixed)
+        print(f"\n输入 (长句混合): '{paragraph_long_and_mixed}'")
+        print(f"得分: {result_long['score']}, 金句内容: '{result_long['quote']}'")
+        print(f"【推荐理由】: {result_long['explanation']}")
