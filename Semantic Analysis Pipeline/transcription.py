@@ -66,14 +66,16 @@ def process_video_to_transcript(video_path: str, output_audio_name: str, output_
     print(f"  2. 文稿文件: {output_json_name}")
 
 
-video_file_name = "interview.mp4"       # <--- 根据实际视频名称改
-output_audio_name = "extracted_audio.wav" # <--- 可改
-output_json_name = "transcript.json"      # <--- 可改
+if __name__ == "__main__":
+    video_file_name = "interview.mp4"          # <--- 根据实际视频名称修改
+    output_audio_name = "extracted_audio.wav"  # <--- 可自定义输出音频文件名
+    output_json_name = "transcript.json"       # <--- 可自定义输出转写结果文件名
 
-colab_video_path = f"/{video_file_name}" # <--- 根绝实际视频路径改
+    colab_video_path = f"/{video_file_name}"   # <--- 根据实际路径调整
 
-# 检查视频文件是否存在
-if os.path.exists(colab_video_path):
-    process_video_to_transcript(colab_video_path, output_audio_name, output_json_name)
-else:
-    print(f"错误：找不到视频文件 '{colab_video_path}'")
+    # 检查视频文件是否存在
+    if os.path.exists(colab_video_path):
+        process_video_to_transcript(colab_video_path, output_audio_name, output_json_name)
+    else:
+        print(f"错误：找不到视频文件 '{colab_video_path}'")
+
