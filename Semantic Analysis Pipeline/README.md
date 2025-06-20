@@ -75,9 +75,9 @@ Final Review (by DeepSeek):
 Then, we feed the original paragraph along with the candidate list to DeepSeek, which acts as a final judge.
 Leveraging its deep language understanding, it selects the most essential and irreplaceable keywords from the shortlist.
 
-#### 🪄 3. Golden Quote Detection (analyze_golden_quote)
+#### 🪄 3. Golden Quote Detection (analyze_golden_quote.py)
 
 Uses a targeted prompt to determine whether a paragraph contains a "Golden Quote"—a line that is insightful, emotionally powerful, or easily shareable.
 
-Logic :Use a clearly defined prompt with the DeepSeek API → input the paragraph text → obtain the scoring result.
+Logic :Use a clearly defined prompt with the DeepSeek API → input the paragraph text → obtain the scoring result and reason for recommendation.
 
