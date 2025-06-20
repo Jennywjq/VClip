@@ -81,3 +81,7 @@ Uses a targeted prompt to determine whether a paragraph contains a "Golden Quote
 
 Logic :Use a clearly defined prompt with the DeepSeek API → input the paragraph text → obtain the scoring result and reason for recommendation.
 
+#### 🪄 4. scoring_pipeline.py
+
+This script is the main orchestrator for the text analysis (Stage 3) of the VClip project. Its primary purpose is to take the semantically segmented paragraphs from Stage 2 and enrich them with a multi-dimensional "dissemination score" to evaluate their potential as highlight clips.
+
