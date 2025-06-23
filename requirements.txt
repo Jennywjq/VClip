@@ -1,0 +1,9 @@
+opencv-python
+dashscope
+
+numba==0.58.1
+openai-whisper
+torch
+openai
+transformers
+jieba
