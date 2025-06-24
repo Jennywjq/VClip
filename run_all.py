@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath('Semantic Analysis Pipeline'))
 from videoExtract import extract_frames
 from imgDifference import detect_scene_changes
 from visual_scorer_api import run_visual_scoring_pipeline
-from clip_export import export_final_clips # (我们将修改此文件以创建这个新函数)
+from clip_export import export_final_clips 
 
 from transcription import process_video_to_transcript
 from segment_text import semantic_segment_final
@@ -134,7 +134,7 @@ def main():
     extract_frames(VIDEO_INPUT_PATH, FRAMES_DIR)
     process_video_to_transcript(VIDEO_INPUT_PATH, AUDIO_PATH, TRANSCRIPT_PATH)
 
-    print("\n========== 阶段 2: 视觉与文本分析 (并行) ==========")
+    print("\n========== 阶段 2: 视觉与文本分析 ==========")
     print("--- 视觉分析流 ---")
     detect_scene_changes(FRAMES_DIR, SCENE_SEGMENTS_PATH)
     run_visual_scoring_pipeline(api_key=QWEN_API_KEY, frame_dir=FRAMES_DIR, segment_file=SCENE_SEGMENTS_PATH, output_file=VISUAL_SCORES_PATH)
