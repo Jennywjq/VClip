@@ -13,7 +13,8 @@ def calc_hist(img1, img2):
     cv2.normalize(hist2, hist2)
     return cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)     # 数值越低相似值越低差异越大
 
-def detect_scene_changes(frame_dir, fps=1, threshold=0.8):
+#def detect_scene_changes(frame_dir, fps=1, threshold=0.8):
+def detect_scene_changes(frame_dir, output_file, fps=1, threshold=0.5):
     frames_files = sorted([f for f in os.listdir(frame_dir) if f.endswith('.jpg')])
     if not frames_files:
         print("错误：frames 文件夹为空或不存在 .jpg 图片")
@@ -40,14 +41,26 @@ def detect_scene_changes(frame_dir, fps=1, threshold=0.8):
         "start": str(timedelta(seconds=last_scene_start)),
         "end": str(timedelta(seconds=len(frames_files))),
     })
+ 
+    #os.makedirs("segments", exist_ok=True)
+    #with open("segments/scene_changes.json", "w") as f:
+        #json.dump(scene_segments, f, indent=2, ensure_ascii=False)
 
-    os.makedirs("segments", exist_ok=True)
-    with open("segments/scene_changes.json", "w") as f:
+
+    
+    # 根据传入的完整路径创建父目录
+    output_dir = os.path.dirname(output_file)
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 将结果保存到指定的完整路径
+    with open(output_file, "w", encoding='utf-8') as f:
         json.dump(scene_segments, f, indent=2, ensure_ascii=False)
 
+
+    
     print(f"\n 场景切换检测完成，共生成 {len(scene_segments)} 个片段：")
     for i, seg in enumerate(scene_segments):
         print(f"片段 {i+1}: {seg['start']} --> {seg['end']}")
 
-if __name__ == "__main__":
-    detect_scene_changes("frames", fps=1, threshold=0.8)
+#if __name__ == "__main__":
+    #detect_scene_changes("frames", fps=1, threshold=0.8)
