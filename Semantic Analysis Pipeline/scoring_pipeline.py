@@ -29,7 +29,7 @@ def run_scoring_pipeline(input_path: str, output_path: str, api_key: str):
         print(f"\n[正在处理段落 {i+1}/{len(paragraphs)}]: '{text[:30]}...'")
 
         # 调用情感分析
-        emotion_score = analyze_emotion(text)
+        emotion_score = analyze_emotion(text, api_key)
         print(f"  - 情感分: {emotion_score:.4f}")
 
         # 调用关键词分析 (两步)
