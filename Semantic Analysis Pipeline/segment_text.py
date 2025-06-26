@@ -14,9 +14,11 @@ def semantic_segment_final(transcript_path: str, output_path: str, api_key: str)
         return False
     
     formatted_text = ""
+
     for i, segment in enumerate(transcript_data):
         line_number = i + 1
-        formatted_text += f"{line_number}: {segment['text']}\n"
+        clean_text = segment['text'].replace("`", "").replace("#", "")
+        formatted_text += f"{line_number}: {clean_text}\n"
      
     system_prompt = """
 你是一位专业的视频内容分析师。你的任务是将以下按行号标记的视频文稿，切分成若干个在语义上连贯且完整的“内容段落”。
