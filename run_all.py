@@ -3,6 +3,8 @@ import sys
 import json
 from datetime import timedelta
 
+import statistics 
+
 sys.path.append(os.path.abspath('Video & Audio Extraction'))
 sys.path.append(os.path.abspath('Image Difference Detection'))
 sys.path.append(os.path.abspath('Semantic Analysis Pipeline'))
@@ -105,13 +107,59 @@ def fuse_scores(visual_scores_path, text_scores_path, output_path, w_visual=0.6,
     return output_path
 
 
+def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor, max_cap):
+    """根据一组动态规则来筛选高光片段。"""
+    print("\n[动态筛选模块] 正在根据动态规则筛选高光片段...")
+
+    # 规则 1: 过滤掉时长过短的片段
+    long_enough_segments = []
+    for seg in all_scored_segments:
+        start_sec = timedelta_to_seconds(seg['start'])
+        end_sec = timedelta_to_seconds(seg['end'])
+        if (end_sec - start_sec) >= min_duration:
+            long_enough_segments.append(seg)
+
+    print(f"  -> 规则1 (时长过滤): {len(all_scored_segments)} 个片段中，有 {len(long_enough_segments)} 个时长超过 {min_duration} 秒。")
+
+    if not long_enough_segments:
+        print("  -> 没有足够长的片段可选，流程终止。")
+        return []
+
+    # 规则 2: 只选择分数足够高的精英片段
+    scores = [seg['total_score'] for seg in long_enough_segments]
+    if len(scores) > 1:
+        mean_score = statistics.mean(scores)
+        stdev_score = statistics.stdev(scores)
+        score_threshold = mean_score + std_dev_factor * stdev_score
+    else:
+        # 如果只有一个片段，它就是唯一的选择
+        score_threshold = scores[0] * 0.99
+
+    elite_segments = [
+        seg for seg in long_enough_segments if seg['total_score'] >= score_threshold
+    ]
+
+    print(f"  -> 规则2 (分数过滤): 平均分 {mean_score:.2f}，标准差 {stdev_score:.2f}，筛选门槛 {score_threshold:.2f}。")
+    print(f"     有 {len(elite_segments)} 个精英片段脱颖而出。")
+
+    # 规则 3: 应用数量上限
+    # （精英片段已经按分数排好序，直接取前 max_cap 个即可）
+    final_selection = elite_segments[:max_cap]
+    print(f"  -> 规则3 (数量上限): 最终选定 {len(final_selection)} 个高光片段进行导出。")
+
+    return final_selection
+
 # --- 主函数 ---
 def main():
     # 全局配置
     VIDEO_INPUT_PATH = "/Users/xiaohei/Documents/2025intern/interview.mp4" # <--- 【重要】请将这里替换为你的视频文件路径
     DEEPSEEK_API_KEY = "sk-984f91a660ca40ab9427e513a97f67ca" 
     QWEN_API_KEY = "sk-0a0eefabc3f9421399d0f5981904326b"
-    TOP_K_CLIPS = 5 
+
+    # --- 动态高光片段设置 ---
+    MIN_CLIP_DURATION = 10.0  # (秒) 任何高光片段都不能短于这个时长
+    SCORE_STD_DEV_FACTOR = 0.5 # 筛选分数线：只保留高于“平均分 + 0.5个标准差”的片段。
+    MAX_CLIPS_CAP = 7        # 就算精英片段很多，最终输出的片段数量也不要超过这个上限
 
     # 定义输出路径
     OUTPUT_BASE = "output"
@@ -144,15 +192,25 @@ def main():
     run_scoring_pipeline(SEMANTIC_SEGMENTS_PATH, TEXT_SCORES_PATH, api_key=DEEPSEEK_API_KEY)
 
     print("\n========== 阶段 3: 核心分数融合 ==========")
-    fuse_scores(VISUAL_SCORES_PATH, TEXT_SCORES_PATH, COMBINED_SCORES_PATH)
+    all_segments_path = fuse_scores(VISUAL_SCORES_PATH, TEXT_SCORES_PATH, COMBINED_SCORES_PATH)
+    
+    with open(all_segments_path, 'r', encoding='utf-8') as f:
+        all_scored_segments = json.load(f)
 
-    print("\n========== 阶段 4: 导出高光片段与智能解释 ==========")
+    print("\n========== 阶段 4: 动态筛选高光片段 ==========")
+    final_highlight_segments = select_dynamic_highlights(
+        all_scored_segments=all_scored_segments,
+        min_duration=MIN_CLIP_DURATION,
+        std_dev_factor=SCORE_STD_DEV_FACTOR,
+        max_cap=MAX_CLIPS_CAP
+    )
+
+    print("\n========== 阶段 5: 导出高光片段与智能解释 ==========")
     export_final_clips(
-        combined_scores_path=COMBINED_SCORES_PATH,
+        segments_to_export=final_highlight_segments, 
         original_video_path=VIDEO_INPUT_PATH,
         frames_dir=FRAMES_DIR,
         output_dir=HIGHLIGHTS_DIR,
-        top_k=TOP_K_CLIPS,
         qwen_api_key=QWEN_API_KEY
     )
 
