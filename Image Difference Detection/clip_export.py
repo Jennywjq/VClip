@@ -52,39 +52,38 @@ def find_representative_frame(clip_start_time, clip_end_time, frames_dir):
         frame_path = os.path.join(frames_dir, frame_filename)
     return frame_path if os.path.exists(frame_path) else None
 
-def export_final_clips(combined_scores_path, original_video_path, frames_dir, output_dir, top_k, qwen_api_key):
-    if not os.path.exists(combined_scores_path):
-        print(f"错误：找不到综合评分文件 {combined_scores_path}")
+def export_final_clips(segments_to_export, original_video_path, frames_dir, output_dir, qwen_api_key):
+    """最终的导出函数：接收一个【已经筛选好】的片段列表，并逐个导出。 """
+    if not segments_to_export:
+        print("没有筛选出任何高光片段，任务结束。")
         return
 
-    with open(combined_scores_path, "r", encoding='utf-8') as f:
-        all_segments = json.load(f)
+    print(f"\n准备导出筛选出的 {len(segments_to_export)} 个高光片段...")
 
-    top_segments = all_segments[:top_k]
-    print(f"\n准备导出排名前 {len(top_segments)} 的高光片段...")
-
-    for i, seg in enumerate(top_segments):
+    for i, seg in enumerate(segments_to_export):
         clip_name = f"highlight_{i+1:03d}.mp4"
         clip_path = os.path.join(output_dir, clip_name)
-        print(f"[{i+1}/{len(top_segments)}] 正在导出片段: {clip_name} (总分: {seg['total_score']})")
-        
+
+        print(f"[{i+1}/{len(segments_to_export)}] 正在导出片段: {clip_name} (总分: {seg['total_score']})")
+
+        # ... (这部分剪辑视频和生成解释的代码保持不变) ...
         try:
             cut_clip(original_video_path, seg["start"], seg["end"], clip_path)
-            print(f" 视频剪辑成功: {clip_path}")
+            print(f"  -> 视频剪辑成功: {clip_path}")
         except Exception as e:
-            print(f"视频剪辑失败: {e}")
+            print(f"  -> 视频剪辑失败: {e}")
             continue
 
         rep_frame_path = find_representative_frame(seg["start"], seg["end"], frames_dir)
         if not rep_frame_path:
-            print(" 警告: 未能找到该片段的代表帧，无法生成智能解释。")
+            print("  -> 警告: 未能找到该片段的代表帧，无法生成智能解释。")
             continue
 
         explanation = generate_clip_explanation(seg, rep_frame_path, qwen_api_key)
-        
+
         explanation_file = os.path.join(output_dir, f"highlight_{i+1:03d}_explanation.json")
         with open(explanation_file, "w", encoding='utf-8') as f:
             json.dump(explanation, f, indent=2, ensure_ascii=False)
-        print(f" 智能解释已保存: {explanation_file}")
+        print(f"  -> 智能解释已保存: {explanation_file}")
 
     print(f"\n全部导出任务完成！请查看 '{output_dir}' 文件夹。")
