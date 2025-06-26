@@ -109,7 +109,6 @@ def fuse_scores(visual_scores_path, text_scores_path, output_path, w_visual=0.6,
 
 def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor, max_cap):
     """根据一组动态规则来筛选高光片段。"""
-    print("\n[动态筛选模块] 正在根据动态规则筛选高光片段...")
 
     # 规则 1: 过滤掉时长过短的片段
     long_enough_segments = []
@@ -143,11 +142,70 @@ def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor,
     print(f"     有 {len(elite_segments)} 个精英片段脱颖而出。")
 
     # 规则 3: 应用数量上限
-    # （精英片段已经按分数排好序，直接取前 max_cap 个即可）
     final_selection = elite_segments[:max_cap]
     print(f"  -> 规则3 (数量上限): 最终选定 {len(final_selection)} 个高光片段进行导出。")
 
     return final_selection
+
+
+
+def align_boundaries_to_semantics(highlight_clips, semantic_segments):
+    """寻找与视觉高光重叠度最高的完整语义片段，并采用其边界。"""
+    
+    aligned_clips = []
+
+    # 如果没有语义片段，无法对齐，直接返回原始片段
+    if not semantic_segments:
+        print("  -> 警告: 未找到任何语义片段，跳过边界对齐。")
+        return highlight_clips
+
+    for clip in highlight_clips:
+        clip_start_sec = timedelta_to_seconds(clip['start'])
+        clip_end_sec = timedelta_to_seconds(clip['end'])
+        
+        best_match_segment = None
+        max_overlap = -1
+
+        # 遍历所有句子，找到和当前高光片段重叠时间最长的那一句
+        for sem_seg in semantic_segments:
+            sem_start_sec = timedelta_to_seconds(sem_seg['start_time'])
+            sem_end_sec = timedelta_to_seconds(sem_seg['end_time'])
+            
+            # 计算重叠时长
+            overlap_start = max(clip_start_sec, sem_start_sec)
+            overlap_end = min(clip_end_sec, sem_end_sec)
+            overlap_duration = max(0, overlap_end - overlap_start)
+            
+            if overlap_duration > max_overlap:
+                max_overlap = overlap_duration
+                best_match_segment = sem_seg
+        
+        # 如果找到了最佳匹配的句子，就采用它的边界
+        if best_match_segment:
+            new_start_sec = timedelta_to_seconds(best_match_segment['start_time'])
+            new_end_sec = timedelta_to_seconds(best_match_segment['end_time'])
+            
+            new_start_str = str(timedelta(seconds=new_start_sec)).split('.')[0] + '.' + f"{int((new_start_sec % 1) * 1000):03d}"
+            new_end_str = str(timedelta(seconds=new_end_sec)).split('.')[0] + '.' + f"{int((new_end_sec % 1) * 1000):03d}"
+            
+            aligned_clip = clip.copy()
+            aligned_clip['start'] = new_start_str
+            aligned_clip['end'] = new_end_str
+            aligned_clip['original_start'] = clip['start']
+            aligned_clip['original_end'] = clip['end']
+            aligned_clip['aligned_text'] = best_match_segment['paragraph_text']
+            
+            aligned_clips.append(aligned_clip)
+            print(f"  -> 片段 [{clip['start']} -> {clip['end']}]")
+            print(f"     最大重叠句子为: '{best_match_segment['paragraph_text'][:20]}...'")
+            print(f"     最终对齐为 -> [{new_start_str} -> {new_end_str}]")
+        else:
+            # 如果完全没有重叠的句子，保留原始片段
+            aligned_clips.append(clip)
+            print(f"  -> 片段 [{clip['start']} -> {clip['end']}] 未找到重叠句子，保留原始边界。")
+
+    return aligned_clips
+
 
 # --- 主函数 ---
 def main():
@@ -182,7 +240,7 @@ def main():
     extract_frames(VIDEO_INPUT_PATH, FRAMES_DIR)
     process_video_to_transcript(VIDEO_INPUT_PATH, AUDIO_PATH, TRANSCRIPT_PATH)
 
-    print("\n========== 阶段 2: 视觉与文本分析 ==========")
+    print("\n========== 阶段 2: 视觉与文本分析 (并行) ==========")
     print("--- 视觉分析流 ---")
     detect_scene_changes(FRAMES_DIR, SCENE_SEGMENTS_PATH)
     run_visual_scoring_pipeline(api_key=QWEN_API_KEY, frame_dir=FRAMES_DIR, segment_file=SCENE_SEGMENTS_PATH, output_file=VISUAL_SCORES_PATH)
@@ -198,16 +256,37 @@ def main():
         all_scored_segments = json.load(f)
 
     print("\n========== 阶段 4: 动态筛选高光片段 ==========")
-    final_highlight_segments = select_dynamic_highlights(
+    candidate_highlight_segments = select_dynamic_highlights(
         all_scored_segments=all_scored_segments,
         min_duration=MIN_CLIP_DURATION,
         std_dev_factor=SCORE_STD_DEV_FACTOR,
         max_cap=MAX_CLIPS_CAP
     )
 
-    print("\n========== 阶段 5: 导出高光片段与智能解释 ==========")
+    # 如果在筛选后没有任何片段，就提前结束
+    if not candidate_highlight_segments:
+        print("未能根据筛选规则找到任何合适的高光片段。")
+        print("\n========== 所有任务已完成！ ==========")
+        return
+
+    
+    print("\n========== 阶段 5: 语义边界对齐 ==========")
+    try:
+        with open(SEMANTIC_SEGMENTS_PATH, 'r', encoding='utf-8') as f:
+            semantic_segments = json.load(f)
+        
+        # 调用边界对齐函数
+        aligned_final_clips = align_boundaries_to_semantics(
+            candidate_highlight_segments, 
+            semantic_segments
+        )
+    except FileNotFoundError:
+        print(f"警告：找不到语义分段文件 {SEMANTIC_SEGMENTS_PATH}，将跳过边界对齐步骤。")
+        aligned_final_clips = candidate_highlight_segments
+
+    print("\n========== 阶段 6: 导出高光片段与智能解释 ==========")
     export_final_clips(
-        segments_to_export=final_highlight_segments, 
+        segments_to_export=aligned_final_clips, 
         original_video_path=VIDEO_INPUT_PATH,
         frames_dir=FRAMES_DIR,
         output_dir=HIGHLIGHTS_DIR,
