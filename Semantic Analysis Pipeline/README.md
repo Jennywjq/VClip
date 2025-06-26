@@ -56,12 +56,9 @@ python segment_text.py
 
 #### 🪄 1. Emotion Analysis (analyze_emotion.py)
 
-The model used is the Erlangshen series RoBERTa model: IDEA-CCNL/Erlangshen-Roberta-110M-Sentiment.
-Compared to the standard BERT model, it has been trained on a more diverse range of data types, including a large volume of social media-style text. This makes it more capable of handling internet slang and flexible sentence structures commonly found in TV show or variety show reviews.
-(However, it may still misinterpret certain sarcastic or passive-aggressive expressions.)
+Using the DeepSeek API to conduct emotion scoring.
 
-
-Logic: Load the model → Input the text → Output the emotion (e.g., positive/negative) and confidence score → Convert the result into a numerical score (e.g., +1 for positive, -1 for negative).
+Logic: Use a well-crafted prompt with the DeepSeek API → Input the paragraph text → Receive a structured JSON response → Extract the sentiment_score from -1.0 (very negative) to +1.0 (very positive)
 
 
 #### 🪄 2. Keyword Density Analysis (analyze_keywords.py)
