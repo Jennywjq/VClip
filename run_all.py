@@ -22,15 +22,32 @@ from explanation_generator import generate_clip_explanation
 
 
 def timedelta_to_seconds(time_str: str) -> float:
+    """ 将 'HH:MM:SS.ms' 或 'H:MM:SS' 格式的时间字符串精确转换为浮点数秒。"""
+    if not isinstance(time_str, str):
+        return 0.0
+
+    # 分离毫秒部分（如果存在）
     if '.' in time_str:
-        parts = time_str.split('.')
-        main_part = parts[0]
-        ms_part = parts[1]
+        main_part, ms_part = time_str.split('.')
+        # 确保毫秒部分是数字
+        if not ms_part.isdigit():
+            ms_part = "0"
     else:
-        main_part = time_str
-        ms_part = "0"
-    h, m, s = map(int, main_part.split(':'))
-    return float(h * 3600 + m * 60 + s + float(f"0.{ms_part}"))
+        main_part, ms_part = time_str, "0"
+
+    # 分离时、分、秒
+    parts = main_part.split(':')
+    if len(parts) == 3:
+        try:
+            h, m, s = map(int, parts)
+            # 计算总秒数，并精确加上毫秒
+            total_seconds = float(h * 3600 + m * 60 + s)
+            total_seconds += float(f"0.{ms_part}")
+            return total_seconds
+        except ValueError:
+            return 0.0 
+    return 0.0
+
 
 #动态归一化方法，融合视觉与文本分数
 def fuse_scores(visual_scores_path, text_scores_path, output_path, w_visual=0.6, w_text=0.4):
