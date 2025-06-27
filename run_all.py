@@ -165,13 +165,11 @@ def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor,
     return final_selection
 
 
-
 def align_boundaries_to_semantics(highlight_clips, semantic_segments):
     """寻找与视觉高光重叠度最高的完整语义片段，并采用其边界。"""
-    
+
     aligned_clips = []
 
-    # 如果没有语义片段，无法对齐，直接返回原始片段
     if not semantic_segments:
         print("  -> 警告: 未找到任何语义片段，跳过边界对齐。")
         return highlight_clips
@@ -179,67 +177,67 @@ def align_boundaries_to_semantics(highlight_clips, semantic_segments):
     for clip in highlight_clips:
         clip_start_sec = timedelta_to_seconds(clip['start'])
         clip_end_sec = timedelta_to_seconds(clip['end'])
-        
+
         best_match_segment = None
         max_overlap = -1
 
         # 遍历所有句子，找到和当前高光片段重叠时间最长的那一句
         for sem_seg in semantic_segments:
-            sem_start_sec = timedelta_to_seconds(sem_seg['start_time'])
-            sem_end_sec = timedelta_to_seconds(sem_seg['end_time'])
-            
-            # 计算重叠时长
+            sem_start_sec = timedelta_to_seconds(sem_seg.get('start_time', '0:0:0'))
+            sem_end_sec = timedelta_to_seconds(sem_seg.get('end_time', '0:0:0'))
+
             overlap_start = max(clip_start_sec, sem_start_sec)
             overlap_end = min(clip_end_sec, sem_end_sec)
             overlap_duration = max(0, overlap_end - overlap_start)
-            
+
             if overlap_duration > max_overlap:
                 max_overlap = overlap_duration
                 best_match_segment = sem_seg
-        
+
         # 如果找到了最佳匹配的句子，就采用它的边界
         if best_match_segment:
             new_start_sec = timedelta_to_seconds(best_match_segment['start_time'])
             new_end_sec = timedelta_to_seconds(best_match_segment['end_time'])
-            
+
+            # 重新格式化时间字符串
             new_start_str = str(timedelta(seconds=new_start_sec)).split('.')[0] + '.' + f"{int((new_start_sec % 1) * 1000):03d}"
             new_end_str = str(timedelta(seconds=new_end_sec)).split('.')[0] + '.' + f"{int((new_end_sec % 1) * 1000):03d}"
-            
+
             aligned_clip = clip.copy()
             aligned_clip['start'] = new_start_str
             aligned_clip['end'] = new_end_str
-            aligned_clip['original_start'] = clip['start']
-            aligned_clip['original_end'] = clip['end']
             aligned_clip['aligned_text'] = best_match_segment['paragraph_text']
-            
+
             aligned_clips.append(aligned_clip)
             print(f"  -> 片段 [{clip['start']} -> {clip['end']}]")
             print(f"     最大重叠句子为: '{best_match_segment['paragraph_text'][:20]}...'")
             print(f"     最终对齐为 -> [{new_start_str} -> {new_end_str}]")
         else:
-            # 如果完全没有重叠的句子，保留原始片段
             aligned_clips.append(clip)
             print(f"  -> 片段 [{clip['start']} -> {clip['end']}] 未找到重叠句子，保留原始边界。")
 
     return aligned_clips
 
 
-# --- 主函数 ---
+
 def main():
-    # 全局配置
-    VIDEO_INPUT_PATH = "/Users/xiaohei/Documents/2025intern/interview.mp4" # <--- 【重要】请将这里替换为你的视频文件路径
+    # --- 全局配置 ---
+    VIDEO_INPUT_PATH = "/Users/xiaohei/Documents/2025intern/demo2.mp4" 
     DEEPSEEK_API_KEY = "sk-984f91a660ca40ab9427e513a97f67ca" 
     QWEN_API_KEY = "sk-0a0eefabc3f9421399d0f5981904326b"
+    
+    HISTOGRAM_THRESHOLD = 0.5 # 颜色直方图的相似度阈值(0-1)，值越低，切分越敏感
+    
+    # --- 动态高光配置 ---
+    MIN_CLIP_DURATION = 10.0
+    SCORE_STD_DEV_FACTOR = 0.5
+    MAX_CLIPS_CAP = 7
 
-    # --- 动态高光片段设置 ---
-    MIN_CLIP_DURATION = 10.0  # (秒) 任何高光片段都不能短于这个时长
-    SCORE_STD_DEV_FACTOR = 0.5 # 筛选分数线：只保留高于“平均分 + 0.5个标准差”的片段。
-    MAX_CLIPS_CAP = 7        # 就算精英片段很多，最终输出的片段数量也不要超过这个上限
-
-    # 定义输出路径
+    # --- 输出路径定义 ---
     OUTPUT_BASE = "output"
     FRAMES_DIR = os.path.join(OUTPUT_BASE, "frames")
-    AUDIO_PATH = os.path.join(OUTPUT_BASE, "audio", "extracted_audio.wav")
+    MIXED_AUDIO_PATH = os.path.join(OUTPUT_BASE, "audio", "mixed_audio.wav")
+    VOCALS_DIR = os.path.join(OUTPUT_BASE, "audio", "demucs_separated")
     TRANSCRIPT_PATH = os.path.join(OUTPUT_BASE, "segments", "transcript.json")
     SCENE_SEGMENTS_PATH = os.path.join(OUTPUT_BASE, "segments", "scene_segments.json")
     SEMANTIC_SEGMENTS_PATH = os.path.join(OUTPUT_BASE, "segments", "semantic_segments.json")
@@ -248,27 +246,35 @@ def main():
     COMBINED_SCORES_PATH = os.path.join(OUTPUT_BASE, "score", "combined_scores.json")
     HIGHLIGHTS_DIR = os.path.join(OUTPUT_BASE, "highlights")
 
-    # 创建输出目录
-    for path in [FRAMES_DIR, os.path.dirname(AUDIO_PATH), os.path.dirname(TRANSCRIPT_PATH), os.path.dirname(VISUAL_SCORES_PATH), HIGHLIGHTS_DIR]:
+    for path in [FRAMES_DIR, os.path.dirname(MIXED_AUDIO_PATH), VOCALS_DIR, os.path.dirname(TRANSCRIPT_PATH), os.path.dirname(VISUAL_SCORES_PATH), HIGHLIGHTS_DIR]:
         os.makedirs(path, exist_ok=True)
 
-    # 完整流水线开始
-    print("========== 阶段 1: 视频预处理 ==========")
+    # ===================================================================
+    #                        【工作流开始】
+    # ===================================================================
+    print("========== 阶段 1: 预处理与人声分离 ==========")
     extract_frames(VIDEO_INPUT_PATH, FRAMES_DIR)
-    process_video_to_transcript(VIDEO_INPUT_PATH, AUDIO_PATH, TRANSCRIPT_PATH)
+    extract_audio(VIDEO_INPUT_PATH, MIXED_AUDIO_PATH)
+    clean_vocals_path = separate_vocals(MIXED_AUDIO_PATH, VOCALS_DIR)
 
+    if not clean_vocals_path:
+        print("严重错误：人声分离失败，将使用原始混合音轨进行后续步骤。")
+        clean_vocals_path = MIXED_AUDIO_PATH
+
+    
     print("\n========== 阶段 2: 视觉与文本分析 (并行) ==========")
     print("--- 视觉分析流 ---")
-    detect_scene_changes(FRAMES_DIR, SCENE_SEGMENTS_PATH)
+    detect_scene_changes(FRAMES_DIR, SCENE_SEGMENTS_PATH, threshold=HISTOGRAM_THRESHOLD)
     run_visual_scoring_pipeline(api_key=QWEN_API_KEY, frame_dir=FRAMES_DIR, segment_file=SCENE_SEGMENTS_PATH, output_file=VISUAL_SCORES_PATH)
     
     print("\n--- 文本分析流 ---")
+    transcribe_audio(clean_vocals_path, TRANSCRIPT_PATH)
     semantic_segment_final(TRANSCRIPT_PATH, SEMANTIC_SEGMENTS_PATH, api_key=DEEPSEEK_API_KEY)
     run_scoring_pipeline(SEMANTIC_SEGMENTS_PATH, TEXT_SCORES_PATH, api_key=DEEPSEEK_API_KEY)
 
+
     print("\n========== 阶段 3: 核心分数融合 ==========")
     all_segments_path = fuse_scores(VISUAL_SCORES_PATH, TEXT_SCORES_PATH, COMBINED_SCORES_PATH)
-    
     with open(all_segments_path, 'r', encoding='utf-8') as f:
         all_scored_segments = json.load(f)
 
@@ -280,41 +286,48 @@ def main():
         max_cap=MAX_CLIPS_CAP
     )
 
-    # 如果在筛选后没有任何片段，就提前结束
     if not candidate_highlight_segments:
         print("未能根据筛选规则找到任何合适的高光片段。")
         print("\n========== 所有任务已完成！ ==========")
         return
 
-    
+
     print("\n========== 阶段 5: 语义边界对齐 ==========")
     try:
         with open(SEMANTIC_SEGMENTS_PATH, 'r', encoding='utf-8') as f:
             semantic_segments = json.load(f)
 
-    # 调用边界对齐函数，得到可能包含重复的对齐后列表
-        aligned_clips_with_duplicates = align_boundaries_to_semantics(
+        aligned_clips = align_boundaries_to_semantics(
             candidate_highlight_segments, 
             semantic_segments
         )
     except FileNotFoundError:
         print(f"警告：找不到语义分段文件 {SEMANTIC_SEGMENTS_PATH}，将跳过边界对齐步骤。")
-        aligned_clips_with_duplicates = candidate_highlight_segments
+        aligned_clips = candidate_highlight_segments
 
-    
-    print("\n========== 阶段 5.5: 去除重复片段 ==========")
+
+    print("\n========== 阶段 5.5: 最终质检与去重 ==========")
     final_unique_clips = []
-    seen_boundaries = set() # 用来记录已经见过的片段边界
+    seen_boundaries = set()
 
-    for clip in aligned_clips_with_duplicates:
+    for clip in aligned_clips:
+        # 检查1: 时长是否满足最低要求
+        start_sec = timedelta_to_seconds(clip['start'])
+        end_sec = timedelta_to_seconds(clip['end'])
+        if (end_sec - start_sec) < MIN_CLIP_DURATION:
+            print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] (时长 {(end_sec - start_sec):.1f}s) 短于设定的最短时长 {MIN_CLIP_DURATION}s。")
+            continue # 跳过这个不合格的片段
+
+        # 检查2: 是否与已选中的片段重复
         boundary_key = (clip['start'], clip['end'])
+        if boundary_key in seen_boundaries:
+            print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] 是一个重复片段。")
+            continue # 跳过这个重复的片段
 
-    # 只有当这个标识符没出现过时，才把它加入最终列表
-        if boundary_key not in seen_boundaries:
-            final_unique_clips.append(clip)
-            seen_boundaries.add(boundary_key)
+        final_unique_clips.append(clip)
+        seen_boundaries.add(boundary_key)
 
-    print(f"  -> 去重前有 {len(aligned_clips_with_duplicates)} 个片段，去重后剩余 {len(final_unique_clips)} 个唯一片段。")
+    print(f"  -> 经过最终质检后，剩余 {len(final_unique_clips)} 个合格的唯一片段。")
 
 
     print("\n========== 阶段 6: 导出高光片段与智能解释 ==========")
