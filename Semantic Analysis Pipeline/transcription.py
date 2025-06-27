@@ -14,9 +14,8 @@ def format_seconds_to_hms(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{milliseconds:03d}"
 
 def transcribe_audio(audio_path: str, output_json_path: str):
-    """
-    (新) 接收一个音频文件路径，使用 Whisper 进行转写，并保存结果。
-    """
+    """接收一个音频文件路径，使用 Whisper 进行转写，并保存结果。"""
+    
     if not os.path.exists(audio_path):
         print(f"错误：找不到要转写的音频文件 '{audio_path}'")
         return
