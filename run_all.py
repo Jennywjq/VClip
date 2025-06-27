@@ -291,19 +291,35 @@ def main():
     try:
         with open(SEMANTIC_SEGMENTS_PATH, 'r', encoding='utf-8') as f:
             semantic_segments = json.load(f)
-        
-        # 调用边界对齐函数
-        aligned_final_clips = align_boundaries_to_semantics(
+
+    # 调用边界对齐函数，得到可能包含重复的对齐后列表
+        aligned_clips_with_duplicates = align_boundaries_to_semantics(
             candidate_highlight_segments, 
             semantic_segments
         )
     except FileNotFoundError:
         print(f"警告：找不到语义分段文件 {SEMANTIC_SEGMENTS_PATH}，将跳过边界对齐步骤。")
-        aligned_final_clips = candidate_highlight_segments
+        aligned_clips_with_duplicates = candidate_highlight_segments
+
+    
+    print("\n========== 阶段 5.5: 去除重复片段 ==========")
+    final_unique_clips = []
+    seen_boundaries = set() # 用来记录已经见过的片段边界
+
+    for clip in aligned_clips_with_duplicates:
+        boundary_key = (clip['start'], clip['end'])
+
+    # 只有当这个标识符没出现过时，才把它加入最终列表
+        if boundary_key not in seen_boundaries:
+            final_unique_clips.append(clip)
+            seen_boundaries.add(boundary_key)
+
+    print(f"  -> 去重前有 {len(aligned_clips_with_duplicates)} 个片段，去重后剩余 {len(final_unique_clips)} 个唯一片段。")
+
 
     print("\n========== 阶段 6: 导出高光片段与智能解释 ==========")
     export_final_clips(
-        segments_to_export=aligned_final_clips, 
+        segments_to_export=final_unique_clips, 
         original_video_path=VIDEO_INPUT_PATH,
         frames_dir=FRAMES_DIR,
         output_dir=HIGHLIGHTS_DIR,
