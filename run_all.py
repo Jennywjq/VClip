@@ -1,3 +1,4 @@
+
 import os
 import sys
 import json
@@ -19,6 +20,7 @@ from videoExtract import extract_audio
 from vocal_separator import separate_vocals
 from transcription import transcribe_audio
 
+
 from segment_text import semantic_segment_final
 from scoring_pipeline import run_scoring_pipeline
 
@@ -26,7 +28,7 @@ from explanation_generator import generate_clip_explanation
 
 
 def timedelta_to_seconds(time_str: str) -> float:
-    """ 将 'HH:MM:SS.ms' 或 'H:MM:SS' 格式的时间字符串精确转换为浮点数秒。"""
+    """(修复版) 将 'HH:MM:SS.ms' 或 'H:MM:SS' 格式的时间字符串精确转换为浮点数秒。"""
     if not isinstance(time_str, str):
         return 0.0
 
@@ -53,8 +55,8 @@ def timedelta_to_seconds(time_str: str) -> float:
     return 0.0
 
 
-#动态归一化方法，融合视觉与文本分数
 def fuse_scores(visual_scores_path, text_scores_path, output_path, w_visual=0.6, w_text=0.4):
+    print("\n[融合模块] 正在使用动态归一化方法，融合视觉与文本分数...")
     with open(visual_scores_path, 'r', encoding='utf-8') as f:
         visual_segments = json.load(f)
     with open(text_scores_path, 'r', encoding='utf-8') as f:
@@ -69,6 +71,7 @@ def fuse_scores(visual_scores_path, text_scores_path, output_path, w_visual=0.6,
     min_text_score = min(all_text_scores)
     score_range = max_text_score - min_text_score
     
+    print(f"[融合模块] 文本分数分析: 最高分={max_text_score}, 最低分={min_text_score}, 分数范围={score_range}")
 
     # 处理所有分数都相同的特殊情况，避免除以零
     if score_range == 0:
@@ -98,7 +101,7 @@ def fuse_scores(visual_scores_path, text_scores_path, output_path, w_visual=0.6,
         if overlapping_raw_scores:
             avg_raw_text_score = sum(overlapping_raw_scores) / len(overlapping_raw_scores)
             if score_range == 0:
-                normalized_text_score = 0.5 
+                normalized_text_score = 0.5 # 如果所有分数相同，给一个中间值
             else:
                 # 应用 Min-Max Scaling 公式
                 normalized_text_score = (avg_raw_text_score - min_text_score) / score_range
@@ -129,7 +132,10 @@ def fuse_scores(visual_scores_path, text_scores_path, output_path, w_visual=0.6,
 
 
 def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor, max_cap):
-    """根据一组动态规则来筛选高光片段。"""
+    """
+    根据一组动态规则来筛选高光片段。
+    """
+    print("\n[动态筛选模块] 正在根据动态规则筛选高光片段...")
 
     # 规则 1: 过滤掉时长过短的片段
     long_enough_segments = []
@@ -163,14 +169,20 @@ def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor,
     print(f"     有 {len(elite_segments)} 个精英片段脱颖而出。")
 
     # 规则 3: 应用数量上限
+    # （精英片段已经按分数排好序，直接取前 max_cap 个即可）
     final_selection = elite_segments[:max_cap]
     print(f"  -> 规则3 (数量上限): 最终选定 {len(final_selection)} 个高光片段进行导出。")
 
     return final_selection
 
 
+
 def align_boundaries_to_semantics(highlight_clips, semantic_segments):
-    """寻找与视觉高光重叠度最高的完整语义片段，并采用其边界。"""
+    """
+    【最终修复版 V2】寻找与视觉高光重叠度最高的完整语义片段，并采用其边界。
+    这个版本修复了之前可能导致时间点错乱的逻辑 bug。
+    """
+    print("\n[边界对齐模块] 正在使用【最大重叠 V2】算法进行最终对齐...")
 
     aligned_clips = []
 
@@ -222,20 +234,21 @@ def align_boundaries_to_semantics(highlight_clips, semantic_segments):
 
     return aligned_clips
 
-
+# --- 主函数 ---
 
 def main():
     # --- 全局配置 ---
-    VIDEO_INPUT_PATH = "/Users/xiaohei/Documents/2025intern/demo2.mp4" 
+    VIDEO_INPUT_PATH = "/Users/xiaohei/Documents/2025intern/demo3.mp4" # 您的视频路径
     DEEPSEEK_API_KEY = "sk-984f91a660ca40ab9427e513a97f67ca" 
     QWEN_API_KEY = "sk-0a0eefabc3f9421399d0f5981904326b"
     
-    HISTOGRAM_THRESHOLD = 0.5 # 颜色直方图的相似度阈值(0-1)，值越低，切分越敏感
+    HISTOGRAM_THRESHOLD = 0.2 # 颜色直方图的相似度阈值(0-1)，值越低，切分越敏感
     
-    # --- 动态高光配置 ---
+    # --- 动态高光配置 (保持不变) ---
     MIN_CLIP_DURATION = 10.0
-    SCORE_STD_DEV_FACTOR = 0.5
-    MAX_CLIPS_CAP = 7
+    SCORE_STD_DEV_FACTOR = 0.1
+    MAX_CLIPS_CAP = 30
+    
 
     # --- 输出路径定义 ---
     OUTPUT_BASE = "output"
@@ -250,6 +263,7 @@ def main():
     COMBINED_SCORES_PATH = os.path.join(OUTPUT_BASE, "score", "combined_scores.json")
     HIGHLIGHTS_DIR = os.path.join(OUTPUT_BASE, "highlights")
 
+    # --- 创建输出目录 ---
     for path in [FRAMES_DIR, os.path.dirname(MIXED_AUDIO_PATH), VOCALS_DIR, os.path.dirname(TRANSCRIPT_PATH), os.path.dirname(VISUAL_SCORES_PATH), HIGHLIGHTS_DIR]:
         os.makedirs(path, exist_ok=True)
 
@@ -260,21 +274,23 @@ def main():
     extract_frames(VIDEO_INPUT_PATH, FRAMES_DIR)
     extract_audio(VIDEO_INPUT_PATH, MIXED_AUDIO_PATH)
     clean_vocals_path = separate_vocals(MIXED_AUDIO_PATH, VOCALS_DIR)
-
+    
     if not clean_vocals_path:
         print("严重错误：人声分离失败，将使用原始混合音轨进行后续步骤。")
         clean_vocals_path = MIXED_AUDIO_PATH
 
-    
     print("\n========== 阶段 2: 视觉与文本分析 (并行) ==========")
     print("--- 视觉分析流 ---")
     detect_scene_changes(FRAMES_DIR, SCENE_SEGMENTS_PATH, threshold=HISTOGRAM_THRESHOLD)
+    
     run_visual_scoring_pipeline(api_key=QWEN_API_KEY, frame_dir=FRAMES_DIR, segment_file=SCENE_SEGMENTS_PATH, output_file=VISUAL_SCORES_PATH)
     
     print("\n--- 文本分析流 ---")
+
     transcribe_audio(clean_vocals_path, TRANSCRIPT_PATH)
     semantic_segment_final(TRANSCRIPT_PATH, SEMANTIC_SEGMENTS_PATH, api_key=DEEPSEEK_API_KEY)
     run_scoring_pipeline(SEMANTIC_SEGMENTS_PATH, TEXT_SCORES_PATH, api_key=DEEPSEEK_API_KEY)
+
 
 
     print("\n========== 阶段 3: 核心分数融合 ==========")
@@ -294,7 +310,7 @@ def main():
         print("未能根据筛选规则找到任何合适的高光片段。")
         print("\n========== 所有任务已完成！ ==========")
         return
-
+    
 
     print("\n========== 阶段 5: 语义边界对齐 ==========")
     try:
@@ -309,7 +325,9 @@ def main():
         print(f"警告：找不到语义分段文件 {SEMANTIC_SEGMENTS_PATH}，将跳过边界对齐步骤。")
         aligned_clips = candidate_highlight_segments
 
-
+    # ===================================================================
+    #              【新增】阶段 5.5: 最终质检 (去重 & 时长检查)
+    # ===================================================================
     print("\n========== 阶段 5.5: 最终质检与去重 ==========")
     final_unique_clips = []
     seen_boundaries = set()
@@ -344,6 +362,7 @@ def main():
     )
 
     print("\n========== 所有任务已完成！ ==========")
+
 
 if __name__ == "__main__":
     main()
