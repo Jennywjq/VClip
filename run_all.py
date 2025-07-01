@@ -14,7 +14,11 @@ from imgDifference import detect_scene_changes
 from visual_scorer_api import run_visual_scoring_pipeline
 from clip_export import export_final_clips 
 
-from transcription import process_video_to_transcript
+#from transcription import process_video_to_transcript
+from videoExtract import extract_audio
+from vocal_separator import separate_vocals
+from transcription import transcribe_audio
+
 from segment_text import semantic_segment_final
 from scoring_pipeline import run_scoring_pipeline
 
