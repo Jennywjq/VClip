@@ -7,3 +7,5 @@ torch
 openai
 transformers
 jieba
+
+demucs
