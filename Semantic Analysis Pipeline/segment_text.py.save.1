@@ -1,0 +1,21 @@
+
+
+if __name__ == "__main__":
+    my_api_key = "sk-984f91a660ca40ab9427e513a97f67ca"   # <--- 可以改 API 密钥 
+
+    google_drive_base_path = "/content/drive/My Drive/"    # <--- 改路径
+    colab_output_folder = os.path.join(google_drive_base_path, "Colab_Output") 
+
+    os.makedirs(colab_output_folder, exist_ok=True)
+
+    input_transcript = os.path.join(colab_output_folder, "transcript.json") 
+    output_segmented = os.path.join(colab_output_folder, "segmented_transcript.json")
+
+    if os.path.exists(input_transcript):
+        semantic_segment_final(
+            transcript_path=input_transcript,
+            output_path=output_segmented,
+            api_key=my_api_key
+        )
+    else:
+        print(f"错误: 找不到输入文件 '{input_transcript}'。请确保阶段一的脚本已成功运行，并且 'transcript.json' 文件存在于 Google Drive 的 '{colab_output_folder}' 路径下。")
