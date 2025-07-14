@@ -238,7 +238,7 @@ def align_boundaries_to_semantics(highlight_clips, semantic_segments):
 
 def main():
     # --- 全局配置 ---
-    VIDEO_INPUT_PATH = "/Users/xiaohei/Documents/2025intern/demo3.mp4" # 您的视频路径
+    VIDEO_INPUT_PATH = "/home/root1/vclip/VClip/demo3.mp4" # 您的视频路径
     DEEPSEEK_API_KEY = "sk-984f91a660ca40ab9427e513a97f67ca" 
     QWEN_API_KEY = "sk-0a0eefabc3f9421399d0f5981904326b"
     
