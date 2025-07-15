@@ -384,6 +384,12 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
                 print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] (时长 {(end_sec - start_sec):.1f}s) 短于设定的最短时长 {MIN_CLIP_DURATION}s。")
                 continue # 跳过这个不合格的片段
 
+            #规则1.5: 时长是否超过最大允许
+            if (end_sec - start_sec) > MAX_CLIP_DURATION:
+                print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] (时长 {(end_sec - start_sec):.1f}s) 超过最大时长 {MAX_CLIP_DURATION}s。")
+                continue  # 跳过这个超长片段
+            
+
             # 检查2: 是否与已选中的片段重复
             boundary_key = (clip['start'], clip['end'])
             if boundary_key in seen_boundaries:
