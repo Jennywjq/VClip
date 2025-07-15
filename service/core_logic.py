@@ -160,7 +160,7 @@ def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor,
     for seg in all_scored_segments:
         start_sec = timedelta_to_seconds(seg['start'])
         end_sec = timedelta_to_seconds(seg['end'])
-        if (end_sec - start_sec) >= min_duration:
+        if max_duration >= (end_sec - start_sec) >= min_duration:
             long_enough_segments.append(seg)
 
     print(f"  -> 规则1 (时长过滤): {len(all_scored_segments)} 个片段中，有 {len(long_enough_segments)} 个时长超过 {min_duration} 秒。")
@@ -168,11 +168,6 @@ def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor,
     if not long_enough_segments:
         print("  -> 没有足够长的片段可选，流程终止。")
         return []
-
-    #规则1.5: 时长是否超过最大允许
-if (end_sec - start_sec) > MAX_CLIP_DURATION:
-    print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] (时长 {(end_sec - start_sec):.1f}s) 超过最大时长 {MAX_CLIP_DURATION}s。")
-    continue  # 跳过这个超长片段
 
 
     # 规则 2: 只选择分数足够高的精英片段
@@ -348,6 +343,7 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
         candidate_highlight_segments = select_dynamic_highlights(
             all_scored_segments=all_scored_segments,
             min_duration=MIN_CLIP_DURATION,
+            max_duration=MAX_CLIP_DURATION,
             std_dev_factor=SCORE_STD_DEV_FACTOR,
             max_cap=MAX_CLIPS_CAP
         )
@@ -384,13 +380,13 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
                 print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] (时长 {(end_sec - start_sec):.1f}s) 短于设定的最短时长 {MIN_CLIP_DURATION}s。")
                 continue # 跳过这个不合格的片段
 
-            #规则1.5: 时长是否超过最大允许
+            # 检查2: 时长是否超过最大允许
             if (end_sec - start_sec) > MAX_CLIP_DURATION:
                 print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] (时长 {(end_sec - start_sec):.1f}s) 超过最大时长 {MAX_CLIP_DURATION}s。")
                 continue  # 跳过这个超长片段
             
 
-            # 检查2: 是否与已选中的片段重复
+            # 检查3: 是否与已选中的片段重复
             boundary_key = (clip['start'], clip['end'])
             if boundary_key in seen_boundaries:
                 print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] 是一个重复片段。")
