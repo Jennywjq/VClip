@@ -169,6 +169,12 @@ def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor,
         print("  -> 没有足够长的片段可选，流程终止。")
         return []
 
+    #规则1.5: 时长是否超过最大允许
+if (end_sec - start_sec) > MAX_CLIP_DURATION:
+    print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] (时长 {(end_sec - start_sec):.1f}s) 超过最大时长 {MAX_CLIP_DURATION}s。")
+    continue  # 跳过这个超长片段
+
+
     # 规则 2: 只选择分数足够高的精英片段
     scores = [seg['total_score'] for seg in long_enough_segments]
     if len(scores) > 1:
@@ -262,6 +268,7 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
     HISTOGRAM_THRESHOLD = 0.2
     
     MIN_CLIP_DURATION = 10.0
+    MAX_CLIP_DURATION = 300.0
     SCORE_STD_DEV_FACTOR = 0.1
     MAX_CLIPS_CAP = 30
 
