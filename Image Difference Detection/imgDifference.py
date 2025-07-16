@@ -1,66 +1,46 @@
+from scenedetect import VideoManager, SceneManager
+from scenedetect.detectors import ContentDetector
 import os
-import cv2
 import json
 from datetime import timedelta
 
-def calc_hist(img1, img2):
-    # 利用视频所提取的.jpg图片转化为hsv以比较直方图差异
-    hsv1 = cv2.cvtColor(img1, cv2.COLOR_BGR2HSV)
-    hsv2 = cv2.cvtColor(img2, cv2.COLOR_BGR2HSV)
-    hist1 = cv2.calcHist([hsv1], [0, 1], None, [50, 60], [0, 180, 0, 256])
-    hist2 = cv2.calcHist([hsv2], [0, 1], None, [50, 60], [0, 180, 0, 256])
-    cv2.normalize(hist1, hist1)
-    cv2.normalize(hist2, hist2)
-    return cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)     # 数值越低相似值越低差异越大
 
-#def detect_scene_changes(frame_dir, fps=1, threshold=0.8):
-def detect_scene_changes(frame_dir, output_file, fps=1, threshold=0.5):
-    frames_files = sorted([f for f in os.listdir(frame_dir) if f.endswith('.jpg')])
-    if not frames_files:
-        print("错误：frames 文件夹为空或不存在 .jpg 图片")
-        return
 
+def detect_scene_changes(video_path, output_file, threshold=27.0):
+    """
+    用 PySceneDetect 分析视频分段
+    threshold: 越低越敏感，越高越不敏感（一般 27~35）
+    """
+    print(f"正在检测场景切换: {video_path} (threshold={threshold})")
+
+    video_manager = VideoManager([video_path])
+    scene_manager = SceneManager()
+    scene_manager.add_detector(ContentDetector(threshold=threshold))
+
+    video_manager.set_downscale_factor(1)
+    video_manager.start()
+
+    scene_manager.detect_scenes(frame_source=video_manager)
+    scene_list = scene_manager.get_scene_list()
+
+    # 生成 JSON 格式
     scene_segments = []
-    last_scene_start = 0
-    prev_image = None
+    for start_time, end_time in scene_list:
+        start_s = start_time.get_seconds()
+        end_s = end_time.get_seconds()
+        scene_segments.append({
+            "start": str(timedelta(seconds=start_s)),
+            "end": str(timedelta(seconds=end_s))
+        })
 
-    for idx, f in enumerate(frames_files):
-        img_path = os.path.join(frame_dir, f)
-        img = cv2.imread(img_path)
-        if prev_image is not None:
-            sim = calc_hist(prev_image, img)
-            if sim < threshold:
-                scene_segments.append({
-                    "start": str(timedelta(seconds=last_scene_start)),
-                    "end": str(timedelta(seconds=idx))
-                })
-                last_scene_start = idx
-        prev_image = img
-
-    scene_segments.append({
-        "start": str(timedelta(seconds=last_scene_start)),
-        "end": str(timedelta(seconds=len(frames_files))),
-    })
- 
-    #os.makedirs("segments", exist_ok=True)
-    #with open("segments/scene_changes.json", "w") as f:
-        #json.dump(scene_segments, f, indent=2, ensure_ascii=False)
-
-
-    
-    # 根据传入的完整路径创建父目录
+    # 创建目录
     output_dir = os.path.dirname(output_file)
     os.makedirs(output_dir, exist_ok=True)
 
-    # 将结果保存到指定的完整路径
-    with open(output_file, "w", encoding='utf-8') as f:
+    # 写 JSON
+    with open(output_file, "w", encoding="utf-8") as f:
         json.dump(scene_segments, f, indent=2, ensure_ascii=False)
 
-
-    
-    print(f"\n 场景切换检测完成，共生成 {len(scene_segments)} 个片段：")
+    print(f"\n场景切换检测完成，共生成 {len(scene_segments)} 个片段：")
     for i, seg in enumerate(scene_segments):
-        print(f"片段 {i+1}: {seg['start']} --> {seg['end']}")
-
-#if __name__ == "__main__":
-    #detect_scene_changes("frames", fps=1, threshold=0.8)
+        print(f"片段 {i + 1}: {seg['start']} --> {seg['end']}")
