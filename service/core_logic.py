@@ -152,7 +152,7 @@ def fuse_scores(visual_scores_path, text_scores_path, output_path, w_visual=0.6,
     return output_path
 
 
-def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor, max_cap):
+def select_dynamic_highlights(all_scored_segments, min_duration,max_duration, std_dev_factor, max_cap):
     """根据一组动态规则来筛选高光片段。"""
 
     # 规则 1: 过滤掉时长过短的片段
@@ -168,7 +168,6 @@ def select_dynamic_highlights(all_scored_segments, min_duration, std_dev_factor,
     if not long_enough_segments:
         print("  -> 没有足够长的片段可选，流程终止。")
         return []
-
 
     # 规则 2: 只选择分数足够高的精英片段
     scores = [seg['total_score'] for seg in long_enough_segments]
@@ -260,8 +259,9 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
     DEEPSEEK_API_KEY = "sk-984f91a660ca40ab9427e513a97f67ca" 
     QWEN_API_KEY = "sk-0a0eefabc3f9421399d0f5981904326b"
     
-    HISTOGRAM_THRESHOLD = 0.2
-    
+    #HISTOGRAM_THRESHOLD = 0.2
+    PYSCENE_SENSITIVITY = 27.0    
+
     MIN_CLIP_DURATION = 10.0
     MAX_CLIP_DURATION = 300.0
     SCORE_STD_DEV_FACTOR = 0.1
@@ -324,7 +324,7 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
 
         print("\n========== 阶段 2: 视觉与文本分析 (并行) ==========")
         print("--- 视觉分析流 ---")
-        detect_scene_changes(FRAMES_DIR, SCENE_SEGMENTS_PATH, threshold=HISTOGRAM_THRESHOLD)
+        detect_scene_changes(video_input_path, SCENE_SEGMENTS_PATH, threshold=PYSCENE_SENSITIVITY)
         run_visual_scoring_pipeline(api_key=QWEN_API_KEY, frame_dir=FRAMES_DIR, segment_file=SCENE_SEGMENTS_PATH, output_file=VISUAL_SCORES_PATH)
     
 
@@ -343,9 +343,9 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
         candidate_highlight_segments = select_dynamic_highlights(
             all_scored_segments=all_scored_segments,
             min_duration=MIN_CLIP_DURATION,
-            max_duration=MAX_CLIP_DURATION,
             std_dev_factor=SCORE_STD_DEV_FACTOR,
-            max_cap=MAX_CLIPS_CAP
+            max_cap=MAX_CLIPS_CAP,
+            max_duration=MAX_CLIP_DURATION
         )
 
         if not candidate_highlight_segments:
@@ -380,13 +380,13 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
                 print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] (时长 {(end_sec - start_sec):.1f}s) 短于设定的最短时长 {MIN_CLIP_DURATION}s。")
                 continue # 跳过这个不合格的片段
 
-            # 检查2: 时长是否超过最大允许
+            #规则1.5: 时长是否超过最大允许
             if (end_sec - start_sec) > MAX_CLIP_DURATION:
                 print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] (时长 {(end_sec - start_sec):.1f}s) 超过最大时长 {MAX_CLIP_DURATION}s。")
                 continue  # 跳过这个超长片段
             
 
-            # 检查3: 是否与已选中的片段重复
+            # 检查2: 是否与已选中的片段重复
             boundary_key = (clip['start'], clip['end'])
             if boundary_key in seen_boundaries:
                 print(f"  -> 质检淘汰: 片段 [{clip['start']} -> {clip['end']}] 是一个重复片段。")
