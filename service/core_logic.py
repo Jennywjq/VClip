@@ -9,7 +9,9 @@ import statistics
 sys.path.append(os.path.abspath('Video & Audio Extraction'))
 sys.path.append(os.path.abspath('Image Difference Detection'))
 sys.path.append(os.path.abspath('Semantic Analysis Pipeline'))
+sys.path.append(os.path.abspath('service'))
 
+from videoExtract import convert_to_mp4
 from videoExtract import extract_frames
 from imgDifference import detect_scene_changes
 from visual_scorer_api import run_visual_scoring_pipeline
@@ -19,7 +21,7 @@ from vocal_separator import separate_vocals
 from transcription import transcribe_audio
 from segment_text import semantic_segment_final
 from scoring_pipeline import run_scoring_pipeline
-
+from intelligent_reframe import reframe_to_vertical_video 
 
 def download_video(video_url: str, save_dir: str) -> str | None:
     """从给定的URL下载视频到指定目录。"""
@@ -29,7 +31,7 @@ def download_video(video_url: str, save_dir: str) -> str | None:
         response = requests.get(video_url, stream=True, timeout=1800, headers=headers) # 30分钟超时
         response.raise_for_status()
 
-        filename = "input_video.mp4" # 使用统一的文件名
+        filename = "input_video.original" 
         save_path = os.path.join(save_dir, filename)
         
         with open(save_path, 'wb') as f:
@@ -174,7 +176,8 @@ def select_dynamic_highlights(all_scored_segments, min_duration,max_duration, st
     if len(scores) > 1:
         mean_score = statistics.mean(scores)
         stdev_score = statistics.stdev(scores)
-        score_threshold = mean_score + std_dev_factor * stdev_score
+#        score_threshold = mean_score - std_dev_factor * stdev_score
+        score_threshold = 0.0
     else:
         # 如果只有一个片段，它就是唯一的选择
         score_threshold = scores[0] * 0.99
@@ -260,12 +263,12 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
     QWEN_API_KEY = "sk-0a0eefabc3f9421399d0f5981904326b"
     
     #HISTOGRAM_THRESHOLD = 0.2
-    PYSCENE_SENSITIVITY = 27.0    
+    PYSCENE_SENSITIVITY = 85.0    
 
     MIN_CLIP_DURATION = 10.0
     MAX_CLIP_DURATION = 300.0
-    SCORE_STD_DEV_FACTOR = 0.1
-    MAX_CLIPS_CAP = 30
+    SCORE_STD_DEV_FACTOR = 1.0
+    MAX_CLIPS_CAP = 100
 
 
     
@@ -273,10 +276,11 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
     base_work_dir = "task_outputs"
     task_work_dir = os.path.join(base_work_dir, task_id)
     os.makedirs(task_work_dir, exist_ok=True)
+    os.chmod(task_work_dir, 0o777)
     
     # 2. 下载视频
-    video_input_path = download_video(video_url, task_work_dir)
-    if not video_input_path:
+    original_video_path = download_video(video_url, task_work_dir)
+    if not original_video_path:
         send_completion_callback(task_id, "failed", {"error": "Video download failed."})
         return
 
@@ -298,21 +302,18 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
         print(f"正在为任务 {task_id} 准备输出目录...")
         for path in [FRAMES_DIR, os.path.dirname(MIXED_AUDIO_PATH), VOCALS_DIR, os.path.dirname(TRANSCRIPT_PATH), os.path.dirname(VISUAL_SCORES_PATH), HIGHLIGHTS_DIR]:
             os.makedirs(path, exist_ok=True)
+            os.chmod(task_work_dir, 0o777)
         print("输出目录准备完毕。")
-
-#        DEEPSEEK_API_KEY = api_keys.get('deepseek')
-       # QWEN_API_KEY = api_keys.get('qwen')
-
-       # HISTOGRAM_THRESHOLD = configs.get('histogram_threshold', 0.2)
-
-       # MIN_CLIP_DURATION = configs.get('min_clip_duration', 10.0)
-       # SCORE_STD_DEV_FACTOR = configs.get('score_std_dev_factor', 0.3)
-       # MAX_CLIPS_CAP = configs.get('max_clips_cap', 30)
 
 
         # ===================================================================
         #                        【工作流开始】
         # ===================================================================
+        print("==========阶段0:标准化视频格式 =========")
+        video_input_path = convert_to_mp4(original_video_path)
+        print(f"视频已标准化为:{video_input_path}")
+
+       
         print("========== 阶段 1: 预处理与人声分离 ==========")
         extract_frames(video_input_path, FRAMES_DIR)
         extract_audio(video_input_path, MIXED_AUDIO_PATH)
@@ -406,6 +407,36 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
             output_dir=HIGHLIGHTS_DIR,
             qwen_api_key=QWEN_API_KEY
         )
+       
+        # ==========================================================
+        #       【新增】阶段 7: 为每个高光片段生成 9:16 竖屏版本
+        # ==========================================================
+        print("\n========== 阶段 7: 开始为每个高光片段生成 9:16 竖屏版本 ==========")
+        try:
+            # 1. 找出所有刚刚在阶段6中生成的高光片段文件
+            original_highlight_files = [f for f in os.listdir(HIGHLIGHTS_DIR) if f.endswith('.mp4') and '_9x16_vertical' not in f]
+            print(f"找到 {len(original_highlight_files)} 个原始高光片段准备进行转换。")
+
+            # 2. 遍历每个高光片段，并为其创建对应的9:16版本
+            for clip_filename in original_highlight_files:
+                original_clip_path = os.path.join(HIGHLIGHTS_DIR, clip_filename)
+                
+                # 构造新生成的竖屏视频的文件名
+                file_name, file_ext = os.path.splitext(clip_filename)
+                vertical_clip_output_path = os.path.join(HIGHLIGHTS_DIR, f"{file_name}_9x16_vertical{file_ext}")
+                
+                print(f"\n--- 正在转换: {clip_filename} ---")
+                
+                # 调用我们封装好的智能转换函数
+                reframe_to_vertical_video(
+                    input_video_path=original_clip_path,
+                    output_video_path=vertical_clip_output_path
+                )
+                print(f"--- 完成转换: {clip_filename} ---")
+
+        except Exception as reframe_error:
+            print(f"错误：在阶段 7 (智能竖屏转换) 中发生错误: {reframe_error}")
+
 
         print("\n========== 所有任务已完成！ ==========")
         print(f" 任务 {task_id} 处理成功。")
@@ -416,32 +447,76 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
         # ==========================================================
         # --- 任务成功，准备包含【内网URL】的回调结果 ---
 
+       # SERVER_PUBLIC_IP = "192.168.3.57" 
+       # BASE_URL = f"http://{SERVER_PUBLIC_IP}"
+
+        # 找出所有生成的mp4文件
+      #  try:
+         #   highlight_files = [f for f in os.listdir(HIGHLIGHTS_DIR) if f.endswith('.mp4')]
+
+        # 为每个文件生成可访问的URL
+        #    highlight_urls = [f"{BASE_URL}/task_outputs/{task_id}/highlights/{f}" for f in highlight_files]
+
+       #     final_results = {
+      #          "message": "Processing completed successfully.",
+     #           "clips": highlight_urls,
+                # 提供一个可以直接在浏览器中查看所有结果的链接
+    #            "browse_results_url": f"{BASE_URL}/task_outputs/{task_id}/"
+   #         }
+  #      except Exception as result_error:
+ #           final_results = {"message": "Processing completed, but failed to generate result URLs.", "error": str(result_error)}
+
+#        send_completion_callback(task_id, "completed", final_results)        
+
+
+        # ==========================================================
+        #       【核心改动：构造包含两种视频URL的回调结果】
+        # ==========================================================
+        # --- 任务成功，准备包含【内网URL】的回调结果 ---
         SERVER_PUBLIC_IP = "192.168.3.57" 
         BASE_URL = f"http://{SERVER_PUBLIC_IP}"
 
-        # 找出所有生成的mp4文件
         try:
-            highlight_files = [f for f in os.listdir(HIGHLIGHTS_DIR) if f.endswith('.mp4')]
+            # 找出所有原始高光片段（不包含我们新生成的竖屏版）
+            original_files = [f for f in os.listdir(HIGHLIGHTS_DIR) if f.endswith('.mp4') and '_9x16_vertical' not in f]
+            
+            # 创建一个列表，用来存放每一组视频（原始+竖屏）的URL
+            clips_data = []
 
-        # 为每个文件生成可访问的URL
-            highlight_urls = [f"{BASE_URL}/task_outputs/{task_id}/highlights/{f}" for f in highlight_files]
+            for original_file in original_files:
+                # 原始视频的URL
+                original_url = f"{BASE_URL}/task_outputs/{task_id}/highlights/{original_file}"
+                
+                # 查找其对应的竖屏版本是否存在
+                file_name, file_ext = os.path.splitext(original_file)
+                vertical_filename = f"{file_name}_9x16_vertical{file_ext}"
+                vertical_filepath = os.path.join(HIGHLIGHTS_DIR, vertical_filename)
+
+                vertical_url = None # 默认为空
+                if os.path.exists(vertical_filepath):
+                    vertical_url = f"{BASE_URL}/task_outputs/{task_id}/highlights/{vertical_filename}"
+                
+                # 将这一组URL作为一个对象添加到列表中
+                clips_data.append({
+                    "original_clip_url": original_url,
+                    "vertical_9x16_clip_url": vertical_url
+                })
 
             final_results = {
                 "message": "Processing completed successfully.",
-                "clips": highlight_urls,
-                # 提供一个可以直接在浏览器中查看所有结果的链接
+                "clips": clips_data, # 使用新的、结构化的列表
                 "browse_results_url": f"{BASE_URL}/task_outputs/{task_id}/"
             }
         except Exception as result_error:
             final_results = {"message": "Processing completed, but failed to generate result URLs.", "error": str(result_error)}
 
-        send_completion_callback(task_id, "completed", final_results)        
+        send_completion_callback(task_id, "completed", final_results)
 
 
-        # --- 4. 任务成功，准备并发送成功回调 ---
-        # 结果可以是从 export_final_clips 函数返回的剪辑信息
-       # final_results = {"message": "Processing completed successfully.", "output_path": os.path.join(task_work_dir, "highlights")} 
-       # send_completion_callback(task_id, "completed", final_results)
+
+
+
+
 
     except Exception as e:
         # --- 5. 任何步骤出错，捕获异常并发送失败回调 ---
