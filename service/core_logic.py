@@ -262,8 +262,7 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
     DEEPSEEK_API_KEY = "sk-984f91a660ca40ab9427e513a97f67ca" 
     QWEN_API_KEY = "sk-0a0eefabc3f9421399d0f5981904326b"
     
-    #HISTOGRAM_THRESHOLD = 0.2
-    PYSCENE_SENSITIVITY = 85.0    
+    PYSCENE_SENSITIVITY = 50.0    
 
     MIN_CLIP_DURATION = 10.0
     MAX_CLIP_DURATION = 300.0
@@ -409,8 +408,6 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
         )
        
         # ==========================================================
-        #       【新增】阶段 7: 为每个高光片段生成 9:16 竖屏版本
-        # ==========================================================
         print("\n========== 阶段 7: 开始为每个高光片段生成 9:16 竖屏版本 ==========")
         try:
             # 1. 找出所有刚刚在阶段6中生成的高光片段文件
@@ -442,35 +439,6 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
         print(f" 任务 {task_id} 处理成功。")
        
 
-        # ==========================================================
-        #              【核心改动：生成可访问的 URL】
-        # ==========================================================
-        # --- 任务成功，准备包含【内网URL】的回调结果 ---
-
-       # SERVER_PUBLIC_IP = "192.168.3.57" 
-       # BASE_URL = f"http://{SERVER_PUBLIC_IP}"
-
-        # 找出所有生成的mp4文件
-      #  try:
-         #   highlight_files = [f for f in os.listdir(HIGHLIGHTS_DIR) if f.endswith('.mp4')]
-
-        # 为每个文件生成可访问的URL
-        #    highlight_urls = [f"{BASE_URL}/task_outputs/{task_id}/highlights/{f}" for f in highlight_files]
-
-       #     final_results = {
-      #          "message": "Processing completed successfully.",
-     #           "clips": highlight_urls,
-                # 提供一个可以直接在浏览器中查看所有结果的链接
-    #            "browse_results_url": f"{BASE_URL}/task_outputs/{task_id}/"
-   #         }
-  #      except Exception as result_error:
- #           final_results = {"message": "Processing completed, but failed to generate result URLs.", "error": str(result_error)}
-
-#        send_completion_callback(task_id, "completed", final_results)        
-
-
-        # ==========================================================
-        #       【核心改动：构造包含两种视频URL的回调结果】
         # ==========================================================
         # --- 任务成功，准备包含【内网URL】的回调结果 ---
         SERVER_PUBLIC_IP = "192.168.3.57" 
@@ -511,11 +479,6 @@ def execute_full_pipeline(task_id: str, video_url: str, api_keys: dict, configs:
             final_results = {"message": "Processing completed, but failed to generate result URLs.", "error": str(result_error)}
 
         send_completion_callback(task_id, "completed", final_results)
-
-
-
-
-
 
 
     except Exception as e:
